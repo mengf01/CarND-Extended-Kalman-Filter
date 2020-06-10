@@ -26,16 +26,50 @@ void KalmanFilter::Predict() {
   /**
    * TODO: predict the state
    */
+  x_ = F_ * x_;
+  P_ = F_ * P_ * F_.transpose() + Q_;
 }
 
 void KalmanFilter::Update(const VectorXd &z) {
   /**
    * TODO: update the state by using Kalman Filter equations
    */
+  MatrixXd y = z - H_ * x_;
+  MatrixXd HT = H_.transpose();
+  MatrixXd S = H_ * P_ * HT + R_;
+  MatrixXd K = P_ * HT * S.inverse();
+
+  //new estimate
+  x_ = x_ + (K * y);
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
 }
 
 void KalmanFilter::UpdateEKF(const VectorXd &z) {
   /**
    * TODO: update the state by using Extended Kalman Filter equations
+   For lidar measurements, the error equation is y = z - H * x'. For radar measurements, the functions
+   that map the x vector [px, py, vx, vy] to polar coordinates are non-linear. Instead of using H to calculate
+   y = z - H * x', for radar measurements you'll have to use the equations that map from cartesian to polar
+   coordinates: y = z - h(x').
    */
+  
+  VectorXd z_pred(3);
+  z_pred = tools.CartesianToPolar(x_);
+  VectorXd y = z - z_pred;
+  //  the resulting angle phi in the y vector should be adjusted so that it is between -pi and pi
+  if (y(1) < -M_PI) {y(1) += 2 * M_PI;}
+  if (y(1) > M_PI) {y(1) -= 2 * M_PI;}
+  
+  MatrixXd Ht = H_.transpose();
+  MatrixXd S = H_ * P_ * Ht + R_;
+  MatrixXd Si = S.inverse();
+  MatrixXd PHt = P_ * Ht;
+  MatrixXd K = PHt * Si;
+
+  x_ = x_ + (K * y);
+  long x_size = x_.size();
+  MatrixXd I = MatrixXd::Identity(x_size, x_size);
+  P_ = (I - K * H_) * P_;
 }
